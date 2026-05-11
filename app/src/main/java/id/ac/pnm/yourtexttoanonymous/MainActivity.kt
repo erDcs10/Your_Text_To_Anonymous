@@ -15,11 +15,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import id.ac.pnm.yourtexttoanonymous.ui.theme.YourTextToAnonymousTheme
+import android.util.Log
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        val currentUser = authManager.getCurrentUser()
+        if (currentUser == null) {
+            Log.d("AuthFlow", "Not Authenticated. Triggering Auth UI...")
+            authManager.authenticate()
+        } else {
+            Log.d("AuthFlow", "Authenticated as ${currentUser.uid}. Proceed to Backend.") 
+        }
+
         setContent {
             YourTextToAnonymousTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
