@@ -20,6 +20,7 @@ import android.util.Log
 class MainActivity : ComponentActivity() {
 
     private val authManager by lazy { AuthManager(this) }
+    private val matchmakingManager = MatchmakingManager()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -50,6 +51,18 @@ class MainActivity : ComponentActivity() {
                     } else {
                         Text(text = "Status: Authenticated")
                         Text(text = "UID: ${currentUser.uid}")
+
+                        Button(
+                            onClick = {
+                                matchmakingManager.joinQueue(currentUser.uid) { roomId ->
+                                    Log.d("MainActivity", "Transitioning to chat room: $roomId")
+                                    // TODO Transition to chat room
+                                }
+                            },
+                            modifier = Modifier.padding(top = 16.dp)
+                        ) {
+                            Text("Find Anonymous Match")
+                        }
                     }
                 }
             }
