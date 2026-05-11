@@ -57,6 +57,7 @@ dependencies {
     implementation(libs.play.services.auth)
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.auth)
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
