@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface MessageDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertMessage(message: MessageEntity)
+    fun insertMessage(message: MessageEntity)
 
     @Query("SELECT * FROM messages WHERE roomId = :roomId ORDER BY timestamp ASC")
     fun getMessagesForRoom(roomId: String): Flow<List<MessageEntity>>

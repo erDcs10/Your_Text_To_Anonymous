@@ -15,7 +15,7 @@ playServicesAuth = "21.5.1"
 credentials = "1.5.0-alpha06"
 
 room = "2.6.1"
-ksp = "2.3.0-1.0.29"
+ksp = "2.3.7"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
