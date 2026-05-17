@@ -4,64 +4,93 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Button
-import androidx.compose.material3.Text
-import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import id.ac.pnm.yourtexttoanonymous.ui.theme.YourTextToAnonymousTheme
 import kotlinx.coroutines.launch
-import android.util.Log
-
 
 class MainActivity : ComponentActivity() {
 
     private val authManager by lazy { AuthManager(this) }
     private val matchmakingManager = MatchmakingManager()
+    private lateinit var chatManager: ChatManager
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        val appDb = AppDatabase.getDatabase(this)
+
         setContent {
             YourTextToAnonymousTheme {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(top = 48.dp, start = 16.dp)
+                    modifier = Modifier.fillMaxSize().padding(top = 48.dp, start = 16.dp, end = 16.dp)
                 ) {
                     val scope = rememberCoroutineScope()
                     val currentUser = authManager.getCurrentUser()
+                    var activeRoomId by remember { mutableStateOf<String?>(null) }
+                    var messageText by remember { mutableStateOf("") }
 
                     if (currentUser == null) {
                         Text(text = "Status: Not Authenticated")
                         Button(onClick = {
                             scope.launch {
-                                val result = authManager.authenticateWithGoogle()
-                                if (result.isSuccess) {
-                                    Log.d("Auth", "Logged in as: ${result.getOrNull()?.uid}")
-                                } else {
-                                    Log.e("Auth", "Login error: ${result.exceptionOrNull()?.message}")
-                                }
+                                authManager.authenticateWithGoogle()
                             }
                         }) {
                             Text("Trigger Google Login")
                         }
                     } else {
-                        Text(text = "Status: Authenticated")
-                        Text(text = "UID: ${currentUser.uid}")
+                        if (activeRoomId == null) {
+                            Text(text = "UID: ${currentUser.uid}")
+                            Button(
+                                onClick = {
+                                    matchmakingManager.joinQueue(currentUser.uid) { roomId ->
+                                        chatManager = ChatManager(appDb.messageDao(), currentUser.uid)
+                                        chatManager.listenForMessages(roomId)
+                                        activeRoomId = roomId
+                                    }
+                                },
+                                modifier = Modifier.padding(top = 16.dp)
+                            ) {
+                                Text("Find Anonymous Match")
+                            }
+                        } else {
+                            val roomId = activeRoomId!!
+                            Text("Room: $roomId")
 
-                        Button(
-                            onClick = {
-                                matchmakingManager.joinQueue(currentUser.uid) { roomId ->
-                                    Log.d("MainActivity", "Transitioning to chat room: $roomId")
-                                    // TODO Transition to chat room
+                            val messages by chatManager.getMessagesFlow(roomId).collectAsState(initial = emptyList())
+
+                            LazyColumn(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
+                                items(messages) { msg ->
+                                    val alignment = if (msg.senderId == currentUser.uid) "You" else "Stranger"
+                                    Text("$alignment: ${msg.text}")
                                 }
-                            },
-                            modifier = Modifier.padding(top = 16.dp)
-                        ) {
-                            Text("Find Anonymous Match")
+                            }
+
+                            Row(modifier = Modifier.fillMaxWidth()) {
+                                TextField(
+                                    value = messageText,
+                                    onValueChange = { messageText = it },
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Button(
+                                    onClick = {
+                                        if (messageText.isNotBlank()) {
+                                            chatManager.sendMessage(roomId, messageText)
+                                            messageText = ""
+                                        }
+                                    },
+                                    modifier = Modifier.padding(start = 8.dp)
+                                ) {
+                                    Text("Send")
+                                }
+                            }
                         }
                     }
                 }
