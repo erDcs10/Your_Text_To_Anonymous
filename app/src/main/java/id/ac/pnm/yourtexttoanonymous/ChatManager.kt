@@ -18,6 +18,9 @@ class ChatManager(
 ) {
     private val db = FirebaseDatabase.getInstance().reference
 
+    private var messagesListener: ChildEventListener? = null
+    private var roomStatusListener: com.google.firebase.database.ValueEventListener? = null
+
     fun sendMessage(roomId: String, text: String) {
         val messageId = UUID.randomUUID().toString()
         val messageRef = db.child("rooms").child(roomId).child("messages").child(messageId)
@@ -38,7 +41,7 @@ class ChatManager(
     fun listenForMessages(roomId: String) {
         val messagesRef = db.child("rooms").child(roomId).child("messages")
 
-        messagesRef.addChildEventListener(object : ChildEventListener {
+        messagesListener = object : ChildEventListener {
             override fun onChildAdded(snapshot: DataSnapshot, previousChildName: String?) {
                 val msgMap = snapshot.value as? Map<*, *> ?: return
                 
@@ -70,7 +73,35 @@ class ChatManager(
             override fun onChildRemoved(snapshot: DataSnapshot) {}
             override fun onChildMoved(snapshot: DataSnapshot, previousChildName: String?) {}
             override fun onCancelled(error: DatabaseError) {}
-        })
+        }
+        messagesRef.addChildEventListener(messagesListener!!)
+    }
+
+    fun listenForRoomStatus(roomId: String, onRoomEnded: () -> Unit) {
+        val statusRef = db.child("rooms").child(roomId).child("status")
+        
+        roomStatusListener = object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                if (snapshot.getValue(String::class.java) == "ended") {
+                    cleanup(roomId)
+                    onRoomEnded()
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {}
+        }
+        statusRef.addValueEventListener(roomStatusListener!!)
+    }
+
+    fun disconnect(roomId: String) {
+        db.child("rooms").child(roomId).child("status").setValue("ended")
+        cleanup(roomId)
+    }
+
+    private fun cleanup(roomId: String) {
+        messagesListener?.let { db.child("rooms").child(roomId).child("messages").removeEventListener(it) }
+        roomStatusListener?.let { db.child("rooms").child(roomId).child("status").removeEventListener(it) }
+        
+        db.child("users").child(currentUserId).child("activeRoom").removeValue()
     }
 
     fun getMessagesFlow(roomId: String): Flow<List<MessageEntity>> {

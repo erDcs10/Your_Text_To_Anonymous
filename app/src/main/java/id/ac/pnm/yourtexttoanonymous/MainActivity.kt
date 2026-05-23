@@ -53,6 +53,9 @@ class MainActivity : ComponentActivity() {
                                     matchmakingManager.joinQueue(currentUser.uid) { roomId ->
                                         chatManager = ChatManager(appDb.messageDao(), currentUser.uid)
                                         chatManager.listenForMessages(roomId)
+                                        chatManager.listenForRoomStatus(roomId) {
+                                            activeRoomId = null
+                                        }
                                         activeRoomId = roomId
                                     }
                                 },
@@ -62,7 +65,22 @@ class MainActivity : ComponentActivity() {
                             }
                         } else {
                             val roomId = activeRoomId!!
-                            Text("Room: $roomId")
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                            ) {
+                                Text("Room: $roomId")
+                                Button(
+                                    onClick = {
+                                        chatManager.disconnect(roomId)
+                                        activeRoomId = null // Return to matchmaking screen
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                ) {
+                                    Text("Disconnect")
+                                }
+                            }
 
                             val messages by chatManager.getMessagesFlow(roomId).collectAsState(initial = emptyList())
 
