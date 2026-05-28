@@ -129,4 +129,15 @@ class ChatManager(
             override fun onCancelled(error: DatabaseError) {}
         })
     }
+
+    fun listenForPersistentRooms(onRoomsUpdated: (List<String>) -> Unit) {
+        db.child("users").child(currentUserId).child("persistentRooms")
+            .addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val rooms = snapshot.children.mapNotNull { it.key }
+                    onRoomsUpdated(rooms)
+                }
+                override fun onCancelled(error: DatabaseError) {}
+            })
+    }
 }
