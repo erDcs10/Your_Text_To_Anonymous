@@ -107,4 +107,26 @@ class ChatManager(
     fun getMessagesFlow(roomId: String): Flow<List<MessageEntity>> {
         return messageDao.getMessagesForRoom(roomId)
     }
+
+    fun requestReveal(roomId: String) {
+        db.child("rooms").child(roomId).child("revealRequests").child(currentUserId).setValue(true)
+    }
+
+    fun listenForRevealRequests(roomId: String, onStrangerRequested: () -> Unit) {
+        val revealRef = db.child("rooms").child(roomId).child("revealRequests")
+        
+        revealRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val strangerRequested = snapshot.children.any { child ->
+                    child.key != currentUserId && (child.value as? Boolean) == true
+                }
+                
+                if (strangerRequested) {
+                    onStrangerRequested()
+                }
+            }
+            
+            override fun onCancelled(error: DatabaseError) {}
+        })
+    }
 }
