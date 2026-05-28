@@ -4,6 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,7 +19,7 @@ class MainActivity : ComponentActivity() {
 
     private val authManager by lazy { AuthManager(this) }
     private val matchmakingManager = MatchmakingManager()
-    private lateinit var chatManager: ChatManager
+    // private var chatManager: ChatManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,83 +30,134 @@ class MainActivity : ComponentActivity() {
         setContent {
             YourTextToAnonymousTheme {
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(top = 48.dp, start = 16.dp, end = 16.dp)
+                    modifier = Modifier.fillMaxSize().padding(top = 48.dp, start = 16.dp, end = 16.dp, bottom = 16.dp)
                 ) {
                     val scope = rememberCoroutineScope()
                     val currentUser = authManager.getCurrentUser()
+
+                    var chatManager by remember { mutableStateOf<ChatManager?>(null) }
                     var activeRoomId by remember { mutableStateOf<String?>(null) }
+                    var isAnonymousChat by remember { mutableStateOf(false) } 
                     var messageText by remember { mutableStateOf("") }
+                    
                     var hasRequestedReveal by remember { mutableStateOf(false) }
                     var strangerWantsToReveal by remember { mutableStateOf(false) }
+                    var persistentRooms by remember { mutableStateOf<List<String>>(emptyList()) }
+
+                    LaunchedEffect(currentUser) {
+                        if (currentUser != null) {
+                            val manager = ChatManager(appDb.messageDao(), currentUser.uid)
+                            chatManager = manager
+                            manager.listenForPersistentRooms { rooms ->
+                                persistentRooms = rooms
+                            }
+                        }
+                    }
 
                     if (currentUser == null) {
                         Text(text = "Status: Not Authenticated")
-                        Button(onClick = {
-                            scope.launch {
-                                authManager.authenticateWithGoogle()
-                            }
-                        }) {
+                        Button(onClick = { scope.launch { authManager.authenticateWithGoogle() } }) {
                             Text("Trigger Google Login")
                         }
                     } else {
+                        val manager = chatManager
+                        if (manager == null) {
+                            CircularProgressIndicator(modifier = Modifier.padding(16.dp))
+                            Text("Loading your chats...")
+                            return@Column
+                        }
+
                         if (activeRoomId == null) {
-                            Text(text = "UID: ${currentUser.uid}")
+                            Text(text = "Logged in as: ${currentUser.uid}", style = MaterialTheme.typography.bodySmall)
+                            
                             Button(
                                 onClick = {
                                     matchmakingManager.joinQueue(currentUser.uid) { roomId ->
-                                        chatManager = ChatManager(appDb.messageDao(), currentUser.uid)
-                                        chatManager.listenForMessages(roomId)
-                                        chatManager.listenForRevealRequests(roomId) {
-                                            // TODO handle reveal request
+                                        manager.listenForMessages(roomId)
+                                        manager.listenForRevealRequests(roomId) {
+                                            strangerWantsToReveal = true
                                         }
-                                        chatManager.listenForRoomStatus(roomId) {
+                                        manager.listenForRoomStatus(roomId) {
                                             activeRoomId = null
+                                            hasRequestedReveal = false
+                                            strangerWantsToReveal = false
                                         }
+                                        isAnonymousChat = true
                                         activeRoomId = roomId
                                     }
                                 },
-                                modifier = Modifier.padding(top = 16.dp)
+                                modifier = Modifier.padding(top = 16.dp, bottom = 24.dp).fillMaxWidth()
                             ) {
                                 Text("Find Anonymous Match")
                             }
+
+                            Text("Your Inbox (Revealed Chats)", style = MaterialTheme.typography.titleMedium)
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
+
+                            if (persistentRooms.isEmpty()) {
+                                Text("No permanent chats yet. Reveal your identity with someone to add them here!", color = MaterialTheme.colorScheme.secondary)
+                            } else {
+                                LazyColumn {
+                                    items(persistentRooms) { pRoomId ->
+                                        Card(
+                                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp).clickable {
+                                                manager.listenForMessages(pRoomId)
+                                                isAnonymousChat = false
+                                                activeRoomId = pRoomId
+                                            }
+                                        ) {
+                                            Text(text = "Chat: $pRoomId", modifier = Modifier.padding(16.dp))
+                                        }
+                                    }
+                                }
+                            }
                         } else {
                             val roomId = activeRoomId!!
+                            
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                             ) {
-                                if (strangerWantsToReveal && !hasRequestedReveal) {
-                                    Button(onClick = {
-                                        hasRequestedReveal = true
-                                        chatManager.requestReveal(roomId)
-                                    }) { Text("Accept Reveal!") }
-                                } else if (!hasRequestedReveal) {
-                                    Button(onClick = {
-                                        hasRequestedReveal = true
-                                        chatManager.requestReveal(roomId)
-                                    }) { Text("!reveal") }
-                                } else {
-                                    Text("Reveal Requested...", color = MaterialTheme.colorScheme.primary)
-                                }
+                                if (isAnonymousChat) {
+                                    if (strangerWantsToReveal && !hasRequestedReveal) {
+                                        Button(onClick = {
+                                            hasRequestedReveal = true
+                                            manager.requestReveal(roomId)
+                                        }) { Text("Accept Reveal!") }
+                                    } else if (!hasRequestedReveal) {
+                                        Button(onClick = {
+                                            hasRequestedReveal = true
+                                            manager.requestReveal(roomId)
+                                        }) { Text("!reveal") }
+                                    } else {
+                                        Text("Reveal Requested...", color = MaterialTheme.colorScheme.primary)
+                                    }
 
-                                Button(
-                                    onClick = {
-                                        chatManager.disconnect(roomId)
-                                        activeRoomId = null
-                                        hasRequestedReveal = false
-                                        strangerWantsToReveal = false
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                                ) {
-                                    Text("Disconnect")
+                                    Button(
+                                        onClick = {
+                                            manager.disconnect(roomId)
+                                            activeRoomId = null
+                                            hasRequestedReveal = false
+                                            strangerWantsToReveal = false
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
+                                    ) {
+                                        Text("Disconnect")
+                                    }
+                                } else {
+                                    Text("Permanent Chat", style = MaterialTheme.typography.titleMedium)
+                                    Button(onClick = { activeRoomId = null }) {
+                                        Text("Back to Inbox")
+                                    }
                                 }
                             }
-                            val messages by chatManager.getMessagesFlow(roomId).collectAsState(initial = emptyList())
+
+                            val messages by manager.getMessagesFlow(roomId).collectAsState(initial = emptyList())
 
                             LazyColumn(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
                                 items(messages) { msg ->
-                                    val alignment = if (msg.senderId == currentUser.uid) "You" else "Stranger"
+                                    val alignment = if (msg.senderId == currentUser.uid) "You" else if (isAnonymousChat) "Stranger" else "Friend"
                                     Text("$alignment: ${msg.text}")
                                 }
                             }
@@ -119,7 +171,7 @@ class MainActivity : ComponentActivity() {
                                 Button(
                                     onClick = {
                                         if (messageText.isNotBlank()) {
-                                            chatManager.sendMessage(roomId, messageText)
+                                            manager.sendMessage(roomId, messageText)
                                             messageText = ""
                                         }
                                     },
