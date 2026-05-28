@@ -35,6 +35,8 @@ class MainActivity : ComponentActivity() {
                     val currentUser = authManager.getCurrentUser()
                     var activeRoomId by remember { mutableStateOf<String?>(null) }
                     var messageText by remember { mutableStateOf("") }
+                    var hasRequestedReveal by remember { mutableStateOf(false) }
+                    var strangerWantsToReveal by remember { mutableStateOf(false) }
 
                     if (currentUser == null) {
                         Text(text = "Status: Not Authenticated")
@@ -53,6 +55,9 @@ class MainActivity : ComponentActivity() {
                                     matchmakingManager.joinQueue(currentUser.uid) { roomId ->
                                         chatManager = ChatManager(appDb.messageDao(), currentUser.uid)
                                         chatManager.listenForMessages(roomId)
+                                        chatManager.listenForRevealRequests(roomId) {
+                                            // TODO handle reveal request
+                                        }
                                         chatManager.listenForRoomStatus(roomId) {
                                             activeRoomId = null
                                         }
@@ -70,18 +75,32 @@ class MainActivity : ComponentActivity() {
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
                             ) {
-                                Text("Room: $roomId")
+                                if (strangerWantsToReveal && !hasRequestedReveal) {
+                                    Button(onClick = {
+                                        hasRequestedReveal = true
+                                        chatManager.requestReveal(roomId)
+                                    }) { Text("Accept Reveal!") }
+                                } else if (!hasRequestedReveal) {
+                                    Button(onClick = {
+                                        hasRequestedReveal = true
+                                        chatManager.requestReveal(roomId)
+                                    }) { Text("!reveal") }
+                                } else {
+                                    Text("Reveal Requested...", color = MaterialTheme.colorScheme.primary)
+                                }
+
                                 Button(
                                     onClick = {
                                         chatManager.disconnect(roomId)
-                                        activeRoomId = null // Return to matchmaking screen
+                                        activeRoomId = null
+                                        hasRequestedReveal = false
+                                        strangerWantsToReveal = false
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
                                 ) {
                                     Text("Disconnect")
                                 }
                             }
-
                             val messages by chatManager.getMessagesFlow(roomId).collectAsState(initial = emptyList())
 
                             LazyColumn(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {

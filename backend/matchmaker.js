@@ -63,3 +63,50 @@ queueRef.on("value", async (snapshot) => {
     console.error("❌ Matchmaking failed: ", error);
   }
 });
+
+// Reveal 
+const roomsRef = db.ref("/rooms");
+
+roomsRef.on("child_changed", async (snapshot) => {
+  const room = snapshot.val();
+  const roomId = snapshot.key;
+
+  if (room && room.type === "anonymous" && room.status === "active" && room.revealRequests) {
+    const requesters = Object.keys(room.revealRequests);
+    
+    if (requesters.length === 2 && room.revealRequests[requesters[0]] && room.revealRequests[requesters[1]]) {
+      
+      const newRoomId = uuidv4();
+      const [uid1, uid2] = requesters;
+      const updates = {};
+
+      console.log(`🔄 Both users agreed to reveal! Migrating room ${roomId}...`);
+
+      // Create the new persistent room (E7)
+      updates[`/rooms/${newRoomId}`] = {
+        type: "persistent",
+        status: "active",
+        users: {
+          [uid1]: true,
+          [uid2]: true
+        },
+        createdAt: admin.database.ServerValue.TIMESTAMP
+      };
+
+      // Save to both users' permanent lists (E8)
+      updates[`/users/${uid1}/persistentRooms/${newRoomId}`] = true;
+      updates[`/users/${uid2}/persistentRooms/${newRoomId}`] = true;
+
+      // End the anonymous room and point them to the new one (E10)
+      updates[`/rooms/${roomId}/status`] = "ended";
+      updates[`/rooms/${roomId}/revealedTo`] = newRoomId;
+
+      try {
+        await db.ref().update(updates);
+        console.log(`✅ Reveal Complete! Users moved to permanent room: ${newRoomId}`);
+      } catch (error) {
+        console.error("❌ Reveal migration failed: ", error);
+      }
+    }
+  }
+});
