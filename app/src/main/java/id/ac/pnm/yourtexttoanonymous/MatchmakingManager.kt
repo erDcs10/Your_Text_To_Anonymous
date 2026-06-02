@@ -12,6 +12,8 @@ class MatchmakingManager {
 
     fun joinQueue(uid: String, onMatchFound: (String) -> Unit) {
         val queueRef = db.child("queue").child(uid)
+
+        queueRef.onDisconnect().removeValue()
         
         queueRef.setValue(mapOf("timestamp" to ServerValue.TIMESTAMP))
             .addOnSuccessListener {
@@ -21,6 +23,11 @@ class MatchmakingManager {
             .addOnFailureListener {
                 Log.e("Matchmaking", "Failed to join queue", it)
             }
+    }
+
+    fun leaveQueue(userId: String){
+      db.child("queue").child(userId).removeValue()
+      db.child("queue").child(userId).onDisconnect().cancel()
     }
 
     private fun listenForMatch(uid: String, onMatchFound: (String) -> Unit) {

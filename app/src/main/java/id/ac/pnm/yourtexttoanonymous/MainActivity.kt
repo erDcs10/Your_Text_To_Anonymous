@@ -42,6 +42,7 @@ class MainActivity : ComponentActivity() {
                     var activeRoomId by remember { mutableStateOf<String?>(null) }
                     var isAnonymousChat by remember { mutableStateOf(false) } 
                     var messageText by remember { mutableStateOf("") }
+                    var isSearching by remember { mutableStateOf(false) }
                     
                     var hasRequestedReveal by remember { mutableStateOf(false) }
                     var strangerWantsToReveal by remember { mutableStateOf(false) }
@@ -168,7 +169,9 @@ class MainActivity : ComponentActivity() {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 if (isAnonymousChat) {
-                                    val statusText = if (activeRoomId == "WAITING_FOR_COMMAND") "Anonymous Roomchat" else "Chatting (Type !stop to leave)"
+                                    val statusText = if (activeRoomId == "WAITING_FOR_COMMAND") {
+                                        if (isSearching) "Searching for partner..." else "Anonymous Roomchat"
+                                    } else "Chatting (Type !stop to leave)"
                                     Text(statusText, style = MaterialTheme.typography.titleMedium)
                                     Button(onClick = { activeRoomId = null }) { Text("Back") }
                                 } else {
@@ -185,8 +188,19 @@ class MainActivity : ComponentActivity() {
 
                             LazyColumn(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
                                 items(messages) { msg ->
-                                    val alignment = if (msg.senderId == currentUser.uid) "You" else if (isAnonymousChat) "Stranger" else "Friend"
-                                    Text("$alignment: ${msg.text}")
+                                    val alignment = when (msg.senderId) {
+                                        currentUser.uid -> "You"
+                                        "SYSTEM" -> "System"
+                                        else -> if (isAnonymousChat) "Stranger" else "Friend"
+                                    }
+                                    
+                                    val textColor = if (msg.senderId == "SYSTEM") {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurface
+                                    }
+                                    
+                                    Text("$alignment: ${msg.text}", color = textColor)
                                 }
                             }
 
@@ -203,11 +217,16 @@ class MainActivity : ComponentActivity() {
                                             if (isAnonymousChat && text.startsWith("!")) {
                                                 when (text.lowercase()) {
                                                     "!start" -> {
-                                                        if (roomId == "WAITING_FOR_COMMAND") {
+                                                        if (roomId == "WAITING_FOR_COMMAND" && !isSearching) {
+                                                            isSearching = true
+                                                            manager.insertSystemMessage(roomId, "Finding a partner...")
                                                             matchmakingManager.joinQueue(currentUser.uid) { newRoomId ->
+                                                                isSearching = false // Found a match!
+                                                                manager.insertSystemMessage(newRoomId, "You've connected with a stranger!")
                                                                 manager.listenForMessages(newRoomId)
                                                                 manager.listenForRevealRequests(newRoomId) { strangerWantsToReveal = true }
                                                                 manager.listenForRoomStatus(newRoomId) {
+                                                                    manager.insertSystemMessage(newRoomId, "Stranger has disconnected.")
                                                                     activeRoomId = "WAITING_FOR_COMMAND"
                                                                     hasRequestedReveal = false
                                                                     strangerWantsToReveal = false
@@ -217,7 +236,13 @@ class MainActivity : ComponentActivity() {
                                                         }
                                                     }
                                                     "!stop" -> {
-                                                        if (roomId != "WAITING_FOR_COMMAND") {
+                                                        if (isSearching) {
+                                                            // Cancel the search BEFORE a match is found
+                                                            matchmakingManager.leaveQueue(currentUser.uid)
+                                                            isSearching = false
+                                                            manager.insertSystemMessage(roomId, "Search cancelled.")
+                                                        } else if (roomId != "WAITING_FOR_COMMAND") {
+                                                            // Disconnect from an ACTIVE chat
                                                             manager.disconnect(roomId)
                                                             activeRoomId = "WAITING_FOR_COMMAND"
                                                             hasRequestedReveal = false
