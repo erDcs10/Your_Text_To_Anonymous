@@ -33,6 +33,16 @@ queueRef.on("value", async (snapshot) => {
   });
 
   const [uid1, uid2] = users;
+  const u1Data = (await db.ref(`/users/${uid1}/persistentRooms`).once("value")).val() || {};
+  const u2Data = (await db.ref(`/users/${uid2}/persistentRooms`).once("value")).val() || {};
+  
+  const commonRooms = Object.keys(u1Data).filter(roomId => Object.keys(u2Data).includes(roomId));
+
+  if (commonRooms.length > 0) {
+    console.log(`Skipped match: ${uid1} and ${uid2} are already revealed to each other.`);
+    await db.ref(`/queue/${uid2}`).remove(); 
+    return; 
+  }
   const roomId = uuidv4();
 
   // Create an atomic payload
