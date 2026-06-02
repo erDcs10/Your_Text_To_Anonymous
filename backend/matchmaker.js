@@ -120,3 +120,20 @@ roomsRef.on("child_changed", async (snapshot) => {
     }
   }
 });
+
+roomsRef.on("child_changed", async (snapshot) => {
+  const room = snapshot.val();
+  const roomId = snapshot.key;
+
+  if (room && room.status === "ended" && room.type === "anonymous") {
+    console.log(`Room ${roomId} ended. Scheduling deletion in 5 seconds...`);
+    setTimeout(async () => {
+      try {
+        await db.ref(`/rooms/${roomId}`).remove();
+        console.log(`Garbage Collection: Deleted dead room ${roomId}`);
+      } catch (error) {
+        console.error(`Failed to delete room ${roomId}`, error);
+      }
+    }, 5000);
+  }
+});
