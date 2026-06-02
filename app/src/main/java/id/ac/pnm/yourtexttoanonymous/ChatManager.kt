@@ -140,4 +140,18 @@ class ChatManager(
                 override fun onCancelled(error: DatabaseError) {}
             })
     }
+
+    fun insertSystemMessage(roomId: String, text: String) {
+        val entity = MessageEntity(
+            messageId = java.util.UUID.randomUUID().toString(),
+            roomId = roomId,
+            senderId = "SYSTEM",
+            text = text,
+            timestamp = System.currentTimeMillis(),
+            isSeen = true
+        )
+        CoroutineScope(Dispatchers.IO).launch {
+            messageDao.insertMessage(entity)
+        }
+    }
 }
