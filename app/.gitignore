@@ -1,1 +1,4 @@
 /build
+#index html contains url, but its basically just a test web
+index.html 
+google-services.json
