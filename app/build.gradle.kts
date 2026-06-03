@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.androidx.credentials)
     implementation(libs.androidx.credentials.play.auth)
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+    implementation("com.google.firebase:firebase-messaging:23.4.1")
 
     // room db
     implementation(libs.androidx.room.runtime)

@@ -22,7 +22,12 @@ class ProfileManager {
         )
         db.child("users").child(uid).child("profile").setValue(profileData)
             .addOnSuccessListener {
-                onSuccess()
+                com.google.firebase.messaging.FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+                    if (task.isSuccessful) {
+                        db.child("users").child(uid).child("fcmToken").setValue(task.result)
+                    }
+                    onSuccess()
+                }
             }
     }
 }

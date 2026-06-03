@@ -21,21 +21,28 @@ class ChatManager(
     private var messagesListener: ChildEventListener? = null
     private var roomStatusListener: com.google.firebase.database.ValueEventListener? = null
 
-    fun sendMessage(roomId: String, text: String) {
-        val messageId = UUID.randomUUID().toString()
-        val messageRef = db.child("rooms").child(roomId).child("messages").child(messageId)
+    fun sendMessage(roomId: String, text: String, isAnonymousChat: Boolean = false) {
+        val messageId = java.util.UUID.randomUUID().toString()
+        val timestamp = System.currentTimeMillis()
 
-        val messageData = mapOf(
+        val msgMap = mapOf(
             "messageId" to messageId,
             "senderId" to currentUserId,
             "text" to text,
-            "timestamp" to ServerValue.TIMESTAMP,
+            "timestamp" to timestamp,
             "isSeen" to false
         )
 
-        messageRef.setValue(messageData)
-            .addOnSuccessListener { Log.d("ChatManager", "Message sent") }
-            .addOnFailureListener { Log.e("ChatManager", "Failed", it) }
+        db.child("rooms").child(roomId).child("messages").child(messageId).setValue(msgMap)
+
+        if (!isAnonymousChat) {
+            val notifReq = mapOf(
+                "roomId" to roomId,
+                "senderId" to currentUserId,
+                "text" to text
+            )
+            db.child("notificationRequests").push().setValue(notifReq)
+        }
     }
 
     fun listenForMessages(roomId: String) {

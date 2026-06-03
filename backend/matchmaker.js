@@ -2,7 +2,6 @@ const admin = require("firebase-admin");
 const { v4: uuidv4 } = require("uuid");
 const serviceAccount = require("./serviceAccountKey.json");
 
-// 1. Initialize Firebase with our VIP Pass
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount),
   databaseURL: "https://your-text-to-anonymous-default-rtdb.asia-southeast1.firebasedatabase.app"
@@ -14,17 +13,13 @@ const queueRef = db.ref("/queue");
 console.log("🚀 Custom Matchmaker Backend Started!");
 console.log("Listening for users joining the queue...");
 
-// 2. Listen to the queue continuously
 queueRef.on("value", async (snapshot) => {
-  // If queue is empty or has only 1 person, do nothing.
   if (!snapshot.exists() || snapshot.numChildren() < 2) {
     return;
   }
 
-  // Fetch the oldest 2 users in the queue
   const qSnapshot = await queueRef.orderByChild("timestamp").limitToFirst(2).once("value");
   
-  // Double check we still have 2 (prevents race conditions)
   if (qSnapshot.numChildren() < 2) return; 
 
   const users = [];
@@ -135,5 +130,46 @@ roomsRef.on("child_changed", async (snapshot) => {
         console.error(`Failed to delete room ${roomId}`, error);
       }
     }, 5000);
+  }
+});
+
+const notifRef = db.ref("/notificationRequests");
+
+notifRef.on("child_added", async (snapshot) => {
+  const req = snapshot.val();
+  const reqId = snapshot.key;
+
+  try {
+    const roomSnap = await db.ref(`/rooms/${req.roomId}`).once("value");
+    const room = roomSnap.val();
+
+    if (room && room.users) {
+      const uids = Object.keys(room.users);
+      const receiverId = uids.find(id => id !== req.senderId);
+
+      if (receiverId) {
+        const tokenSnap = await db.ref(`/users/${receiverId}/fcmToken`).once("value");
+        const token = tokenSnap.val();
+
+        if (token) {
+          const payload = {
+            token: token,
+            notification: {
+              title: "New Message",
+              body: req.text
+            },
+            data: {
+              roomId: req.roomId
+            }
+          };
+
+          await admin.messaging().send(payload);
+        }
+      }
+    }
+  } catch (error) {
+    console.error(error);
+  } finally {
+    await db.ref(`/notificationRequests/${reqId}`).remove();
   }
 });
