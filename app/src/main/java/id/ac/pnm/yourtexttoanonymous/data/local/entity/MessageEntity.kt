@@ -1,4 +1,4 @@
-package id.ac.pnm.yourtexttoanonymous
+package id.ac.pnm.yourtexttoanonymous.data.local.entity
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey

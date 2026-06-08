@@ -1,4 +1,4 @@
-package id.ac.pnm.yourtexttoanonymous
+package id.ac.pnm.yourtexttoanonymous.data.remote
 
 import android.content.Context
 import android.util.Log
@@ -10,6 +10,7 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import id.ac.pnm.yourtexttoanonymous.R
 import kotlinx.coroutines.tasks.await
 
 class AuthManager(private val context: Context) {
@@ -23,7 +24,7 @@ class AuthManager(private val context: Context) {
             // setup Google ID request
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(context.getString(R.string.default_web_client_id)) 
+                .setServerClientId(context.getString(R.string.default_web_client_id))
                 .setAutoSelectEnabled(true)
                 .build()
 

@@ -1,16 +1,18 @@
-package id.ac.pnm.yourtexttoanonymous
+package id.ac.pnm.yourtexttoanonymous.data.remote
 
-import android.util.Log
 import com.google.firebase.database.ChildEventListener
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
-import com.google.firebase.database.ServerValue
+import com.google.firebase.database.ValueEventListener
+import id.ac.pnm.yourtexttoanonymous.data.local.dao.MessageDao
+import id.ac.pnm.yourtexttoanonymous.data.local.entity.MessageEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.collections.get
 
 class ChatManager(
     private val messageDao: MessageDao,
@@ -19,10 +21,10 @@ class ChatManager(
     private val db = FirebaseDatabase.getInstance().reference
 
     private var messagesListener: ChildEventListener? = null
-    private var roomStatusListener: com.google.firebase.database.ValueEventListener? = null
+    private var roomStatusListener: ValueEventListener? = null
 
     fun sendMessage(roomId: String, text: String, isAnonymousChat: Boolean = false) {
-        val messageId = java.util.UUID.randomUUID().toString()
+        val messageId = UUID.randomUUID().toString()
         val timestamp = System.currentTimeMillis()
 
         val msgMap = mapOf(
@@ -87,7 +89,7 @@ class ChatManager(
     fun listenForRoomStatus(roomId: String, onRoomEnded: () -> Unit) {
         val statusRef = db.child("rooms").child(roomId).child("status")
         
-        roomStatusListener = object : com.google.firebase.database.ValueEventListener {
+        roomStatusListener = object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 if (snapshot.getValue(String::class.java) == "ended") {
                     cleanup(roomId)
@@ -122,7 +124,7 @@ class ChatManager(
     fun listenForRevealRequests(roomId: String, onStrangerRequested: () -> Unit) {
         val revealRef = db.child("rooms").child(roomId).child("revealRequests")
         
-        revealRef.addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+        revealRef.addValueEventListener(object : ValueEventListener {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val strangerRequested = snapshot.children.any { child ->
                     child.key != currentUserId && (child.value as? Boolean) == true
@@ -139,7 +141,7 @@ class ChatManager(
 
     fun listenForPersistentRooms(onRoomsUpdated: (List<String>) -> Unit) {
         db.child("users").child(currentUserId).child("persistentRooms")
-            .addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+            .addValueEventListener(object : ValueEventListener {
                 override fun onDataChange(snapshot: DataSnapshot) {
                     val rooms = snapshot.children.mapNotNull { it.key }
                     onRoomsUpdated(rooms)
@@ -150,7 +152,7 @@ class ChatManager(
 
     fun insertSystemMessage(roomId: String, text: String) {
         val entity = MessageEntity(
-            messageId = java.util.UUID.randomUUID().toString(),
+            messageId = UUID.randomUUID().toString(),
             roomId = roomId,
             senderId = "SYSTEM",
             text = text,
