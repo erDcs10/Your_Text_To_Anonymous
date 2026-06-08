@@ -13,23 +13,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import id.ac.pnm.yourtexttoanonymous.R
-
-// Color palette
-private val DarkBg = Color(0xFF0F0F14)
-private val CardBg = Color(0xFF1E2A4A)
-private val CardBorder = Color(0xFF3B4E8A)
-private val TitleColor = Color(0xFFE8EAF6)
-private val SubtitleColor = Color(0xFF9CA3AF)
-private val HintColor = Color(0xFF4B5563)
-private val AccentBlue = Color(0xFF7B8FD4)
-private val GoogleBlue = Color(0xFF4285F4)
-
+import id.ac.pnm.yourtexttoanonymous.ui.theme.*
+import androidx.compose.foundation.Image
 @Composable
 fun LoginScreen(onLoginClick: () -> Unit) {
 
@@ -37,7 +29,7 @@ fun LoginScreen(onLoginClick: () -> Unit) {
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulse by infiniteTransition.animateFloat(
         initialValue = 1f,
-        targetValue = 1.06f,
+        targetValue = 1.4f,
         animationSpec = infiniteRepeatable(
             animation = tween(2000, easing = EaseInOutSine),
             repeatMode = RepeatMode.Reverse
@@ -61,28 +53,16 @@ fun LoginScreen(onLoginClick: () -> Unit) {
             Spacer(modifier = Modifier.height(64.dp))
 
             // --- Logo ---
-            Box(
-                contentAlignment = Alignment.Center,
+            Image(
+                painter = painterResource(id = R.drawable.ic_launcher_foreground),
+                contentDescription = "App logo",
+                contentScale = ContentScale.Fit,
                 modifier = Modifier
                     .scale(pulse)
-                    .size(120.dp)
-                    .clip(CircleShape)
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(
-                                Color(0xFF1F2B4A),
-                                Color(0xFF16213E),
-                                Color(0xFF1A1A2E)
-                            )
-                        )
-                    )
-            ) {
-                Text(
-                    text = "✦",
-                    fontSize = 40.sp,
-                    color = AccentBlue
-                )
-            }
+                    .size(180.dp)
+            )
+
+
 
             Spacer(modifier = Modifier.height(40.dp))
 
@@ -90,7 +70,8 @@ fun LoginScreen(onLoginClick: () -> Unit) {
             Text(
                 text = "YourText",
                 fontSize = 32.sp,
-                fontWeight = FontWeight.Medium,
+                fontFamily = LuxoraGroteskFamily,
+                fontWeight = FontWeight.Bold,
                 color = TitleColor,
                 letterSpacing = 0.5.sp
             )
