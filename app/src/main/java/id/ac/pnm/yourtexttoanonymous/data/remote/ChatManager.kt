@@ -163,4 +163,17 @@ class ChatManager(
             messageDao.insertMessage(entity)
         }
     }
+
+    fun requestDeleteRoom(roomId: String, onComplete: (Boolean) -> Unit) {
+        val database = FirebaseDatabase.getInstance().reference
+        val requestRef = database.child("deleteRoomRequests").push()
+
+        val requestData = mapOf(
+            "roomId" to roomId
+        )
+
+        requestRef.setValue(requestData).addOnCompleteListener { task ->
+            onComplete(task.isSuccessful)
+        }
+    }
 }
