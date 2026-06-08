@@ -173,3 +173,25 @@ notifRef.on("child_added", async (snapshot) => {
     await db.ref(`/notificationRequests/${reqId}`).remove();
   }
 });
+
+const logoutRef = db.ref("/logoutRequests");
+
+logoutRef.on("child_added", async (snapshot) => {
+  const req = snapshot.val();
+  const reqId = snapshot.key;
+
+  try {
+    if (req && req.uid) {
+      const updates = {};
+      updates[`/users/${req.uid}/fcmToken`] = null;
+      updates[`/queue/${req.uid}`] = null;
+      updates[`/users/${req.uid}/activeRoom`] = null;
+      updates[`/logoutRequests/${reqId}`] = null;
+
+      await db.ref().update(updates);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+});
+
