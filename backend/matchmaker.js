@@ -195,3 +195,31 @@ logoutRef.on("child_added", async (snapshot) => {
   }
 });
 
+const deleteRoomRef = db.ref("/deleteRoomRequests");
+
+deleteRoomRef.on("child_added", async (snapshot) => {
+  const req = snapshot.val();
+  const reqId = snapshot.key;
+
+  try {
+    if (req && req.roomId) {
+      const roomSnap = await db.ref(`/rooms/${req.roomId}`).once("value");
+      const room = roomSnap.val();
+      const updates = {};
+
+      if (room && room.users) {
+        const uids = Object.keys(room.users);
+        uids.forEach(uid => {
+          updates[`/users/${uid}/persistentRooms/${req.roomId}`] = null;
+        });
+      }
+
+      updates[`/rooms/${req.roomId}`] = null;
+      updates[`/deleteRoomRequests/${reqId}`] = null;
+
+      await db.ref().update(updates);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+});
