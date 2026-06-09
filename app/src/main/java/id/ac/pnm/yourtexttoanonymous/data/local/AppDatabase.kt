@@ -1,9 +1,11 @@
-package id.ac.pnm.yourtexttoanonymous
+package id.ac.pnm.yourtexttoanonymous.data.local
 
 import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import id.ac.pnm.yourtexttoanonymous.data.local.dao.MessageDao
+import id.ac.pnm.yourtexttoanonymous.data.local.entity.MessageEntity
 
 @Database(entities = [MessageEntity::class], version = 1, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
