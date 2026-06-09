@@ -18,6 +18,7 @@ import id.ac.pnm.yourtexttoanonymous.ui.chat.InboxScreen
 import id.ac.pnm.yourtexttoanonymous.ui.chat.ChatScreen
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun AppNavigation(
@@ -36,9 +37,51 @@ fun AppNavigation(
     val navController = rememberNavController()
     val scope = rememberCoroutineScope()
 
+    var firebaseUser by remember { mutableStateOf(FirebaseAuth.getInstance().currentUser) }
+    var currentUserGender by remember { mutableStateOf("Male") }
+
+    DisposableEffect(Unit) {
+        val auth = FirebaseAuth.getInstance()
+        val listener = FirebaseAuth.AuthStateListener { authState ->
+            firebaseUser = authState.currentUser
+        }
+        auth.addAuthStateListener(listener)
+        onDispose { auth.removeAuthStateListener(listener) }
+    }
+
+    LaunchedEffect(firebaseUser) {
+        val user = firebaseUser
+        if (user != null) {
+            profileManager.getProfile(user.uid) { profileData ->
+                if (profileData != null) {
+
+                    currentUserGender = profileData.gender ?: "Male"
+
+                    val manager = ChatManager(appDb.messageDao(), user.uid)
+                    onUpdateChatManager(manager)
+                    manager.listenForPersistentRooms { rooms -> onUpdatePersistentRooms(rooms) }
+
+                    navController.navigate(Screen.Inbox.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                } else {
+                    navController.navigate(Screen.ProfileSetup.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                }
+            }
+        } else {
+            currentUserGender = "Male"
+
+            navController.navigate(Screen.Login.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+
     NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = if (firebaseUser == null) Screen.Login.route else Screen.Inbox.route
     ) {
         // --- LOGIN SCREEN ---
         composable(Screen.Login.route) {
@@ -62,16 +105,17 @@ fun AppNavigation(
                 onNameChange = { inputName = it },
                 onGenderChange = { inputGender = it },
                 onSaveClick = {
-                    if (inputName.isNotBlank() && currentUser != null) {
-                        onUpdateProfileComplete(null) // Trigger loading state
-                        profileManager.saveProfile(currentUser.uid, inputName.trim(), inputGender) {
+                    val user = firebaseUser
+                    if (inputName.isNotBlank() && user != null) {
+                        onUpdateProfileComplete(null) // Trigger loading spinner
+
+                        profileManager.saveProfile(user.uid, inputName.trim(), inputGender) {
                             onUpdateProfileComplete(true)
 
-                            val manager = ChatManager(appDb.messageDao(), currentUser.uid)
+                            val manager = ChatManager(appDb.messageDao(), user.uid)
                             onUpdateChatManager(manager)
                             manager.listenForPersistentRooms { rooms -> onUpdatePersistentRooms(rooms) }
 
-                            // Pop setup stack out entirely and advance to main inbox view
                             navController.navigate(Screen.Inbox.route) {
                                 popUpTo(Screen.ProfileSetup.route) { inclusive = true }
                             }
@@ -83,28 +127,29 @@ fun AppNavigation(
 
         // --- INBOX SCREEN ---
         composable(Screen.Inbox.route) {
-            if (currentUser != null) {
-                var userGenderState by remember { mutableStateOf("Male") }
-
-                LaunchedEffect(currentUser.uid) {
-                    profileManager.getProfile(currentUser.uid) { profileData ->
-                        if (profileData != null) {
-                            userGenderState = profileData.gender
-                        }
-                    }
-                }
-
+            val user = firebaseUser // Use the reactive state here!
+            if (user != null) {
                 InboxScreen(
-                    userId = currentUser.uid,
-                    userGender = userGenderState,
+                    userId = user.uid,
+                    userGender = currentUserGender, // Pass the global state directly!
                     persistentRooms = persistentRooms,
-                    chatManager = chatManager, // <-- ADD THIS ONE LINE!
+                    chatManager = chatManager,
                     onAnonymousChatClick = {
                         navController.navigate(Screen.Chat.createRoute("WAITING_FOR_COMMAND", true))
                     },
                     onPersistentRoomClick = { pRoomId ->
                         chatManager?.listenForMessages(pRoomId)
                         navController.navigate(Screen.Chat.createRoute(pRoomId, false))
+                    },
+                    onDeleteRoomClick = { roomIdToTrash ->
+                        chatManager?.requestDeleteRoom(roomIdToTrash)
+                    },
+                    onLogoutClick = {
+                        authManager.requestLogout(user.uid) {
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(0) { inclusive = true }
+                            }
+                        }
                     }
                 )
             }
@@ -139,7 +184,6 @@ fun AppNavigation(
             }.collectAsState(initial = emptyList())
 
             LaunchedEffect(currentRoomId, isAnonymousChat) {
-                // 1. If we are entering a Permanent Chat, fetch the stranger's profile instantly
                 if (!isAnonymousChat && currentRoomId != "WAITING_FOR_COMMAND") {
                     chatManager?.getStrangerProfile(currentRoomId) { name, gender ->
                         strangerName = name
@@ -147,13 +191,11 @@ fun AppNavigation(
                     }
                 }
 
-                // 2. If we are in an Anonymous Chat, listen for the Reveal Handshake
                 if (isAnonymousChat && currentRoomId != "WAITING_FOR_COMMAND") {
                     chatManager?.listenForRevealRequests(
                         roomId = currentRoomId,
                         onStrangerRequested = { strangerWantsToReveal = true },
                         onBothRevealed = {
-                            // THE HANDSHAKE! Flip UI instantly
                             isAnonymousChat = false
                             strangerWantsToReveal = false
                             hasRequestedReveal = false
@@ -161,7 +203,6 @@ fun AppNavigation(
                             chatManager.saveToPersistentRoom(currentRoomId)
                             chatManager.insertSystemMessage(currentRoomId, "Identities revealed! This chat is now saved in your Inbox.")
 
-                            // Fetch their profile data dynamically
                             chatManager.getStrangerProfile(currentRoomId) { name, gender ->
                                 strangerName = name
                                 strangerGender = gender
@@ -174,16 +215,17 @@ fun AppNavigation(
                         currentRoomId = "WAITING_FOR_COMMAND"
                         hasRequestedReveal = false
                         strangerWantsToReveal = false
-                        strangerName = null // Reset states on disconnect
+                        strangerName = null
                         strangerGender = null
                     }
                 }
             }
 
-            if (currentUser != null && chatManager != null) {
+            val user = firebaseUser
+            if (user != null && chatManager != null) {
                 ChatScreen(
                     roomId = currentRoomId,
-                    currentUserId = currentUser.uid,
+                    currentUserId = user.uid,
                     isAnonymousChat = isAnonymousChat,
                     isSearching = isSearching,
                     strangerWantsToReveal = strangerWantsToReveal,
@@ -203,7 +245,7 @@ fun AppNavigation(
                                         if (currentRoomId == "WAITING_FOR_COMMAND" && !isSearching) {
                                             isSearching = true
                                             chatManager.insertSystemMessage(currentRoomId, "Finding a partner...")
-                                            matchmakingManager.joinQueue(currentUser.uid) { newRoomId ->
+                                            matchmakingManager.joinQueue(user.uid) { newRoomId ->
                                                 isSearching = false
                                                 chatManager.insertSystemMessage(newRoomId, "You've connected with a stranger!")
                                                 chatManager.listenForMessages(newRoomId)
@@ -213,7 +255,7 @@ fun AppNavigation(
                                     }
                                     "!stop" -> {
                                         if (isSearching) {
-                                            matchmakingManager.leaveQueue(currentUser.uid)
+                                            matchmakingManager.leaveQueue(user.uid)
                                             isSearching = false
                                             chatManager.insertSystemMessage(currentRoomId, "Search cancelled.")
                                         } else if (currentRoomId != "WAITING_FOR_COMMAND") {

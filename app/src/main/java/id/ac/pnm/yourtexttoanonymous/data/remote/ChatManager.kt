@@ -184,17 +184,9 @@ class ChatManager(
         }
     }
 
-    fun requestDeleteRoom(roomId: String, onComplete: (Boolean) -> Unit) {
-        val database = FirebaseDatabase.getInstance().reference
-        val requestRef = database.child("deleteRoomRequests").push()
-
-        val requestData = mapOf(
-            "roomId" to roomId
-        )
-
-        requestRef.setValue(requestData).addOnCompleteListener { task ->
-            onComplete(task.isSuccessful)
-        }
+    fun requestDeleteRoom(roomId: String) {
+        val db = com.google.firebase.database.FirebaseDatabase.getInstance().reference
+        db.child("deleteRoomRequests").push().setValue(mapOf("roomId" to roomId))
     }
 
     fun getStrangerProfile(roomId: String, onResult: (name: String?, gender: String?) -> Unit) {
@@ -228,5 +220,19 @@ class ChatManager(
             android.util.Log.e("ChatManager", "Failed to read room users list.", e)
             onResult(null, null)
         }
+    }
+
+    fun listenForLatestMessage(roomId: String, onMessageReceived: (String?) -> Unit) {
+        val messagesRef = db.child("rooms").child(roomId).child("messages")
+
+        // FIX: Force Firebase to sort by time, not by the alphabetical Message ID
+        messagesRef.orderByChild("timestamp").limitToLast(1).addValueEventListener(object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                // Grab the text of the newest message based on time
+                val lastMessage = snapshot.children.firstOrNull()?.child("text")?.getValue(String::class.java)
+                onMessageReceived(lastMessage)
+            }
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+        })
     }
 }

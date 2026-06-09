@@ -52,19 +52,11 @@ class AuthManager(private val context: Context) {
         }
     }
 
-    fun requestLogout(uid: String, onComplete: (Boolean) -> Unit) {
-        val database = FirebaseDatabase.getInstance().reference
-        val requestRef = database.child("logoutRequests").push()
-
-        val requestData = mapOf(
-            "uid" to uid
-        )
-
-        requestRef.setValue(requestData).addOnCompleteListener { task ->
-            if (task.isSuccessful) {
-                FirebaseAuth.getInstance().signOut()
-            }
-            onComplete(task.isSuccessful)
+    fun requestLogout(uid: String, onComplete: () -> Unit) {
+        val db = com.google.firebase.database.FirebaseDatabase.getInstance().reference
+        db.child("logoutRequests").push().setValue(mapOf("uid" to uid)).addOnCompleteListener {
+            com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+            onComplete()
         }
     }
 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -42,6 +43,16 @@ fun ChatScreen(
     onSendClick: () -> Unit,
     onBackClick: () -> Unit
 ) {
+    // 1. Create a state to control the LazyColumn
+    val listState = rememberLazyListState()
+
+    // 2. Watch the messages list. Whenever the size changes, scroll to the very bottom!
+    LaunchedEffect(messages.size) {
+        if (messages.isNotEmpty()) {
+            listState.animateScrollToItem(messages.size - 1)
+        }
+    }
+
     Scaffold(
         containerColor = DarkBg,
         topBar = {
@@ -67,20 +78,20 @@ fun ChatScreen(
             }
         }
     ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(horizontal = 16.dp),
-            contentPadding = PaddingValues(vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(messages) { msg ->
-                MessageBubble(
-                    message = msg,
-                    currentUserId = currentUserId
-                )
-            }
+    LazyColumn(
+        state = listState, // 3. ATTACH THE STATE HERE!
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding)
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(messages) { msg ->
+            MessageBubble(
+                message = msg,
+                currentUserId = currentUserId
+            ) }
         }
     }
 }
@@ -221,12 +232,12 @@ fun MessageBubble(
                             bottomEnd = if (isMe) 4.dp else 20.dp
                         )
                     )
-                    .background(if (isMe) GoogleBlue else WhiteBg.copy(alpha = 0.1f))
+                    .background(if (isMe) Black else WhiteBg.copy(alpha = 0.1f))
                     .padding(horizontal = 16.dp, vertical = 12.dp)
             ) {
                 Text(
                     text = message.text,
-                    color = WhiteBg,
+                    color = TitleColor,
                     fontFamily = LuxoraGroteskFamily,
                     fontSize = 15.sp,
                     lineHeight = 20.sp
