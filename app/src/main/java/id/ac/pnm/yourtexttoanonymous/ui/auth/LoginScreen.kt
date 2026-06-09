@@ -25,7 +25,6 @@ import androidx.compose.foundation.Image
 @Composable
 fun LoginScreen(onLoginClick: () -> Unit) {
 
-    // Pulsing animation for the logo circle
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
     val pulse by infiniteTransition.animateFloat(
         initialValue = 1f,

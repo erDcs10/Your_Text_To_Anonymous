@@ -41,12 +41,10 @@ class MainActivity : ComponentActivity() {
             YourTextToAnonymousTheme {
                 val currentUser = authManager.getCurrentUser()
 
-                // State engines passed into AppNavigation to keep data synchronized
                 var chatManager by remember { mutableStateOf<ChatManager?>(null) }
                 var isProfileComplete by remember { mutableStateOf<Boolean?>(null) }
                 var persistentRooms by remember { mutableStateOf<List<String>>(emptyList()) }
 
-                // Automatically check profile validation rules when a user session exists
                 LaunchedEffect(currentUser) {
                     if (currentUser != null) {
                         profileManager.checkProfileExists(currentUser.uid) { exists ->
@@ -58,20 +56,17 @@ class MainActivity : ComponentActivity() {
                             }
                         }
                     } else {
-                        // Reset local states if logged out
                         isProfileComplete = false
                         chatManager = null
                         persistentRooms = emptyList()
                     }
                 }
 
-                // Full-bleed master canvas that guarantees a solid dark container
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = DarkBg
                 ) {
                     when {
-                        // 1. If user is logged in, but we are still checking the profile status on Firebase, show a dark loading state
                         currentUser != null && isProfileComplete == null -> {
                             Box(
                                 modifier = Modifier.fillMaxSize(),
@@ -88,9 +83,7 @@ class MainActivity : ComponentActivity() {
                             }
                         }
 
-                        // 2. Data checks are fully settled. Hand routing traffic off to the Navigation Engine
                         else -> {
-                            // Calculate the correct start destination screen reactively
                             val initialDestination = when {
                                 currentUser == null -> Screen.Login.route
                                 isProfileComplete == false -> Screen.ProfileSetup.route

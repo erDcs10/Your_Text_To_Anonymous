@@ -193,13 +193,11 @@ class ChatManager(
         android.util.Log.d("ChatManager", "Attempting to fetch stranger profile for room: $roomId")
 
         db.child("rooms").child(roomId).child("users").get().addOnSuccessListener { snapshot ->
-            // Find the User ID in this room that is NOT our own ID
             val strangerUid = snapshot.children.mapNotNull { it.key }.firstOrNull { it != currentUserId }
 
             if (strangerUid != null) {
                 android.util.Log.d("ChatManager", "Found stranger UID: $strangerUid. Fetching profile...")
 
-                // Fetch their profile using the new Firebase Rule we just added
                 db.child("users").child(strangerUid).child("profile").get()
                     .addOnSuccessListener { profileSnap ->
                         val name = profileSnap.child("displayName").getValue(String::class.java)
