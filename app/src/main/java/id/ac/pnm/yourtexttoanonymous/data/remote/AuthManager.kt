@@ -1,4 +1,4 @@
-package id.ac.pnm.yourtexttoanonymous
+package id.ac.pnm.yourtexttoanonymous.data.remote
 
 import android.content.Context
 import android.util.Log
@@ -10,7 +10,9 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
+import id.ac.pnm.yourtexttoanonymous.R
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.database.FirebaseDatabase
 
 class AuthManager(private val context: Context) {
     private val auth: FirebaseAuth = FirebaseAuth.getInstance()
@@ -23,7 +25,7 @@ class AuthManager(private val context: Context) {
             // setup Google ID request
             val googleIdOption = GetGoogleIdOption.Builder()
                 .setFilterByAuthorizedAccounts(false)
-                .setServerClientId(context.getString(R.string.default_web_client_id)) 
+                .setServerClientId(context.getString(R.string.default_web_client_id))
                 .setAutoSelectEnabled(true)
                 .build()
 
@@ -47,6 +49,22 @@ class AuthManager(private val context: Context) {
         } catch (e: Exception) {
             Log.e("AuthManager", "Google Sign-In failed", e)
             Result.failure(e)
+        }
+    }
+
+    fun requestLogout(uid: String, onComplete: (Boolean) -> Unit) {
+        val database = FirebaseDatabase.getInstance().reference
+        val requestRef = database.child("logoutRequests").push()
+
+        val requestData = mapOf(
+            "uid" to uid
+        )
+
+        requestRef.setValue(requestData).addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                FirebaseAuth.getInstance().signOut()
+            }
+            onComplete(task.isSuccessful)
         }
     }
 }
