@@ -127,11 +127,11 @@ fun AppNavigation(
 
         // --- INBOX SCREEN ---
         composable(Screen.Inbox.route) {
-            val user = firebaseUser // Use the reactive state here!
+            val user = firebaseUser
             if (user != null) {
                 InboxScreen(
                     userId = user.uid,
-                    userGender = currentUserGender, // Pass the global state directly!
+                    userGender = currentUserGender,
                     persistentRooms = persistentRooms,
                     chatManager = chatManager,
                     onAnonymousChatClick = {

@@ -33,21 +33,18 @@ class ProfileManager {
             }
     }
 
-    // 2. ADD THIS GET PROFILE FUNCTION
     fun getProfile(uid: String, onResult: (UserProfile?) -> Unit) {
-        // We target the exact "profile" node where the data is saved
         db.child("users").child(uid).child("profile").get()
             .addOnSuccessListener { snapshot ->
                 if (snapshot.exists()) {
-                    // Firebase automatically converts the JSON into your UserProfile data class
                     val profile = snapshot.getValue(UserProfile::class.java)
                     onResult(profile)
                 } else {
-                    onResult(null) // Data doesn't exist
+                    onResult(null)
                 }
             }
             .addOnFailureListener {
-                onResult(null) // Request failed (e.g., no internet)
+                onResult(null)
             }
     }
 }
