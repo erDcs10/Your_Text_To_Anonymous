@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Client</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        #chat-container { display: none; margin-top: 20px; border: 1px solid #ccc; padding: 10px; }
+        #messages { height: 300px; overflow-y: auto; border: 1px solid #eee; margin-bottom: 10px; padding: 5px; }
+    </style>
+</head>
+<body>
+    <h2>Web Test Client</h2>
+    <p>UID: <span id="uid-text"></span></p>
+    <button id="btn-queue">Find Match</button>
+
+    <div id="chat-container">
+        <p>Room: <span id="room-text"></span></p>
+        <div id="messages"></div>
+        <input type="text" id="input-msg">
+        <button id="btn-send">Send</button>
+        <button id="btn-reveal">!reveal</button>
+        <button id="btn-disconnect">Disconnect</button>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            databaseURL: "https://your-text-to-anonymous-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+        
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        const currentUserId = "web-test-" + Math.floor(Math.random() * 100000);
+        document.getElementById("uid-text").innerText = currentUserId;
+
+        let activeRoomId = null;
+
+        document.getElementById("btn-queue").addEventListener("click", () => {
+            db.ref("/queue/" + currentUserId).set({
+                timestamp: firebase.database.ServerValue.TIMESTAMP
+            });
+
+            db.ref("/users/" + currentUserId + "/activeRoom").on("value", (snapshot) => {
+                const roomId = snapshot.val();
+                if (roomId) {
+                    activeRoomId = roomId;
+                    document.getElementById("chat-container").style.display = "block";
+                    document.getElementById("room-text").innerText = roomId;
+                    document.getElementById("btn-queue").style.display = "none";
+                    
+                    db.ref("/users/" + currentUserId + "/activeRoom").off();
+                    listenForMessages(roomId);
+                    listenForRoomStatus(roomId);
+                }
+            });
+        });
+
+        function listenForMessages(roomId) {
+            db.ref("/rooms/" + roomId + "/messages").on("child_added", (snapshot) => {
+                const msg = snapshot.val();
+                const msgDiv = document.createElement("div");
+                const sender = msg.senderId === currentUserId ? "You" : "Stranger";
+                msgDiv.innerText = sender + ": " + msg.text;
+                document.getElementById("messages").appendChild(msgDiv);
+            });
+        }
+
+        function listenForRoomStatus(roomId) {
+            db.ref("/rooms/" + roomId + "/status").on("value", (snapshot) => {
+                if (snapshot.val() === "ended") {
+                    resetUI();
+                }
+            });
+        }
+
+        document.getElementById("btn-send").addEventListener("click", () => {
+            const text = document.getElementById("input-msg").value;
+            if (text && activeRoomId) {
+                const messageId = "msg-" + Date.now();
+                db.ref("/rooms/" + activeRoomId + "/messages/" + messageId).set({
+                    messageId: messageId,
+                    senderId: currentUserId,
+                    text: text,
+                    timestamp: firebase.database.ServerValue.TIMESTAMP,
+                    isSeen: false
+                });
+                document.getElementById("input-msg").value = "";
+            }
+        });
+
+        document.getElementById("btn-reveal").addEventListener("click", () => {
+            if (activeRoomId) {
+                db.ref("/rooms/" + activeRoomId + "/revealRequests/" + currentUserId).set(true);
+            }
+        });
+
+        document.getElementById("btn-disconnect").addEventListener("click", () => {
+            if (activeRoomId) {
+                db.ref("/rooms/" + activeRoomId + "/status").set("ended");
+                resetUI();
+            }
+        });
+
+        function resetUI() {
+            if (activeRoomId) {
+                db.ref("/rooms/" + activeRoomId + "/messages").off();
+                db.ref("/rooms/" + activeRoomId + "/status").off();
+            }
+            activeRoomId = null;
+            document.getElementById("chat-container").style.display = "none";
+            document.getElementById("btn-queue").style.display = "block";
+            document.getElementById("messages").innerHTML = "";
+            document.getElementById("room-text").innerText = "";
+            db.ref("/users/" + currentUserId + "/activeRoom").remove();
+        }
+    </script>
+</body>
+</html>
