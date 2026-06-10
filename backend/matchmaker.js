@@ -69,7 +69,6 @@ queueRef.on("value", async (snapshot) => {
   }
 });
 
-// Reveal 
 const roomsRef = db.ref("/rooms");
 
 roomsRef.on("child_changed", async (snapshot) => {
@@ -87,7 +86,6 @@ roomsRef.on("child_changed", async (snapshot) => {
 
       console.log(`🔄 Both users agreed to reveal! Migrating room ${roomId}...`);
 
-      // Create the new persistent room (E7)
       updates[`/rooms/${newRoomId}`] = {
         type: "persistent",
         status: "active",
@@ -98,11 +96,9 @@ roomsRef.on("child_changed", async (snapshot) => {
         createdAt: admin.database.ServerValue.TIMESTAMP
       };
 
-      // Save to both users' permanent lists (E8)
       updates[`/users/${uid1}/persistentRooms/${newRoomId}`] = true;
       updates[`/users/${uid2}/persistentRooms/${newRoomId}`] = true;
 
-      // End the anonymous room and point them to the new one (E10)
       updates[`/rooms/${roomId}/status`] = "ended";
       updates[`/rooms/${roomId}/revealedTo`] = newRoomId;
 
@@ -152,6 +148,10 @@ notifRef.on("child_added", async (snapshot) => {
         const token = tokenSnap.val();
 
         if (token) {
+          const senderProfileSnap = await db.ref('/users/${req.serderId}/profile').once("value");
+          const senderProfile = senderProfileSnap.val();
+          const senderName = senderProfile && senderProfile.displayName ? senderProfile.displayName : "Stranger";
+
           const payload = {
             token: token,
             notification: {
